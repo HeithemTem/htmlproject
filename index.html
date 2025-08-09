@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mortgage & Refinance Penalty Calculator · EN/FR · No Backend</title>
+  <meta name="description" content="Quebec/Canada mortgage break penalty & refinance savings estimator. Works entirely in your browser. No backend. EN/FR." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Radar -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- jsPDF for PDF export (client-side only) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root { --ring: 0 0% 9%; }
+    html, body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    @media print { .no-print { display:none !important } .mobile-toolbar { display:none !important } }
+    .ad-slot { border:2px dashed #cbd5e1; border-radius: 16px; min-height: 90px; display:grid; place-items:center; color:#64748b; font-size:12px }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    .prose h3 { font-weight: 700; font-size: 1.1rem; margin-top: 1rem }
+    .prose p { color:#334155; font-size: 0.95rem }
+    .prose details { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding:0.75rem 1rem }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-emerald-50/20 min-h-screen">
+  <header class="sticky top-0 z-10 backdrop-blur bg-white/70 border-b">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-emerald-600 text-white grid place-items-center font-bold">$</div>
+        <div>
+          <h1 id="app-title" class="text-xl sm:text-2xl font-bold tracking-tight">Mortgage & Refinance Penalty Calculator</h1>
+          <p id="app-sub" class="text-slate-600 text-sm">Works entirely in your browser. No sign-in. No backend.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 no-print">
+        <button id="langBtn" class="px-3 py-1.5 rounded-xl border text-sm hover:bg-slate-100 transition">FR</button>
+        <button id="shareBtn" class="px-3 py-1.5 rounded-xl border text-sm hover:bg-slate-100 transition">Copy share link</button>
+        <button id="pdfBtn" class="px-3 py-1.5 rounded-xl border text-sm hover:bg-slate-100 transition">Export PDF</button>
+        <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border text-sm hover:bg-slate-100 transition">Print</button>
+        <button id="resetBtn" class="px-3 py-1.5 rounded-xl border text-sm hover:bg-slate-100 transition">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Hero summary -->
+    <section class="lg:col-span-3 rounded-2xl border bg-white/80 backdrop-blur ring-1 ring-slate-200/70 p-4 sm:p-6 shadow-sm">
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+          <div class="text-xs uppercase tracking-wide text-emerald-700" id="heroPenaltyLabel">Estimated penalty</div>
+          <div class="text-2xl sm:text-3xl font-bold mt-1" id="heroPenalty">—</div>
+        </div>
+        <div class="p-4 rounded-xl bg-sky-50 border border-sky-100">
+          <div class="text-xs uppercase tracking-wide text-sky-700" id="heroSavingsLabel">Potential interest savings</div>
+          <div class="text-2xl sm:text-3xl font-bold mt-1" id="heroSavings">—</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="flex items-center justify-between">
+            <div class="text-xs uppercase tracking-wide text-slate-700" id="heroNetLabel">Net outcome</div>
+            <span id="heroBadge" class="text-xs px-2 py-1 rounded-full bg-slate-200 text-slate-800">—</span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-bold mt-1" id="heroNet">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Left: Inputs -->
+    <section class="lg:col-span-2 bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+      <h2 class="text-lg font-semibold mb-3" data-i18n="inputs">Inputs</h2>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="mortType">Mortgage type</label>
+          <select id="mortType" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition">
+            <option value="fixed">Fixed</option>
+            <option value="variable">Variable</option>
+          </select>
+        </div>
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="currency">Currency</label>
+          <select id="currency" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition">
+            <option value="CAD">CAD</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="principal">Original mortgage amount</label>
+          <input id="principal" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="350000" value="450000" />
+        </div>
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="rate">Contract rate (% APR)</label>
+          <input id="rate" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="5.29" value="5.29" />
+        </div>
+
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="amortYears">Amortization (years)</label>
+          <input id="amortYears" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="25" value="25" />
+        </div>
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="termYears">Term length (years)</label>
+          <input id="termYears" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="5" value="5" />
+        </div>
+
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="termStart">Term start date</label>
+          <input id="termStart" type="date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" />
+        </div>
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="breakDate">Break date (today or planned)</label>
+          <input id="breakDate" type="date" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" />
+        </div>
+
+        <div class="group">
+          <label class="block text-xs text-slate-500" data-i18n="payFreq">Payment frequency</label>
+          <select id="payFreq" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition">
+            <option value="m">Monthly (12/yr)</option>
+            <option value="bw">Bi-weekly (26/yr)</option>
+            <option value="abw">Accelerated bi-weekly (26/yr, half-monthly)</option>
+          </select>
+        </div>
+        <div></div>
+
+        <div class="md:col-span-2 p-3 rounded-xl bg-slate-50 border hover:shadow-sm transition">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" id="knowBalance" class="accent-emerald-600" />
+            <span data-i18n="knowBalance">I know my current balance</span>
+          </label>
+          <div class="grid sm:grid-cols-2 gap-3 mt-2">
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="currentBalance">Current balance (if known)</label>
+              <input id="currentBalance" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="320000" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="monthsRemaining">Months remaining in term (override)</label>
+              <input id="monthsRemaining" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="" />
+            </div>
+          </div>
+        </div>
+
+        <div class="md:col-span-2 p-3 rounded-xl bg-slate-50 border hover:shadow-sm transition">
+          <div class="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="compRate">Comparable rate for remaining term (%)</label>
+              <input id="compRate" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="Posted/discounted" value="4.49" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="prepay">Prepayment before breaking ($)</label>
+              <input id="prepay" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="0" value="0" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="fees">Other fees ($)</label>
+              <input id="fees" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="300" value="300" />
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2" data-i18n="irdNote">For fixed rates, lenders typically charge the greater of 3 months’ interest or an Interest Rate Differential (IRD). This IRD estimate uses (contract rate − comparable rate) × balance × remaining term (years).</p>
+        </div>
+
+        <div class="md:col-span-2 p-3 rounded-xl bg-slate-50 border hover:shadow-sm transition">
+          <div class="grid sm:grid-cols-4 gap-3 items-end">
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-500" data-i18n="newRate">Refinance/new rate (% APR)</label>
+              <input id="newRate" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="4.29" value="4.29" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="rollPenalty">Roll penalty into new mortgage?</label>
+              <select id="rollPenalty" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition">
+                <option value="yes">Yes</option>
+                <option value="no" selected>No</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500" data-i18n="horizon">Compare over remaining term months</label>
+              <input id="horizon" type="number" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-300 transition" placeholder="auto" />
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2" data-i18n="compareNote">We compare the interest cost of keeping your current mortgage vs. refinancing at the new rate, over the months remaining in your current term.</p>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button id="calcBtn" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white shadow hover:shadow-md hover:bg-emerald-700 transition">Calculate</button>
+      </div>
+    </section>
+
+    <!-- Right: Results & Ads -->
+    <aside class="space-y-6">
+      <section class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+        <h2 class="text-lg font-semibold mb-3" data-i18n="summary">Summary</h2>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span id="payLabel">Payment (per period)</span><span id="outPaymentPer">—</span></div>
+          <div class="flex justify-between"><span data-i18n="paymentEq">Approx. monthly equivalent</span><span id="outPaymentMoEq">—</span></div>
+          <div class="flex justify-between"><span data-i18n="elapsed">Months elapsed</span><span id="outElapsed">—</span></div>
+          <div class="flex justify-between"><span data-i18n="remain">Months remaining (term)</span><span id="outRemain">—</span></div>
+          <div class="flex justify-between"><span data-i18n="balance">Estimated balance</span><span id="outBalance">—</span></div>
+        </div>
+        <div class="h-px bg-slate-200 my-3"></div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span data-i18n="threeMonths">3 months’ interest</span><span id="outThree">—</span></div>
+          <div class="flex justify-between"><span data-i18n="ird">IRD estimate</span><span id="outIRD">—</span></div>
+          <div class="flex justify-between font-semibold"><span data-i18n="penalty">Estimated penalty</span><span id="outPenalty">—</span></div>
+          <div class="flex justify-between"><span data-i18n="fees2">Other fees</span><span id="outFees">—</span></div>
+          <div class="flex justify-between"><span data-i18n="prepay2">Applied prepayment</span><span id="outPrepay">—</span></div>
+        </div>
+      </section>
+
+      <section class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+        <h2 class="text-lg font-semibold mb-3" data-i18n="refi">Refinance impact</h2>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span data-i18n="intKeep">Interest cost — keep</span><span id="outKeepInt">—</span></div>
+          <div class="flex justify-between"><span data-i18n="intRefi">Interest cost — refi</span><span id="outRefiInt">—</span></div>
+          <div class="flex justify-between"><span data-i18n="savings">Interest savings</span><span id="outSavings">—</span></div>
+          <div class="h-2 bg-slate-200 rounded-full overflow-hidden" title="Savings vs penalty">
+            <div id="savingsBar" class="h-full bg-emerald-500 transition-all" style="width:0%"></div>
+          </div>
+          <div class="flex justify-between font-semibold"><span data-i18n="net">Net vs. penalty & fees</span><span id="outNet">—</span></div>
+          <div class="flex justify-between"><span data-i18n="breakeven">Break-even (months)</span><span id="outBE">—</span></div>
+        </div>
+      </section>
+
+      <!-- NEW: Radar Visualization -->
+      <section class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+        <h2 class="text-lg font-semibold mb-3" data-i18n="visual">Visualization</h2>
+        <canvas id="radarChart" height="280" aria-label="Radar comparison"></canvas>
+        <p class="text-xs text-slate-500 mt-2" id="radarCaption">Higher area = higher cost (worse). Lower is better.</p>
+      </section>
+
+      <section class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+        <h2 class="text-lg font-semibold mb-2" data-i18n="sponsor">Sponsored</h2>
+        <div class="ad-slot">Ad slot – 336×280 / Add AdSense code in &lt;head&gt;</div>
+        <ul class="list-disc ml-5 text-sm mt-3 text-slate-700">
+          <li><a href="#" class="underline">Low-fee Canadian credit card (affiliate)</a></li>
+          <li><a href="#" class="underline">Mortgage rate marketplace (affiliate)</a></li>
+        </ul>
+      </section>
+
+      <section class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-4 ring-1 ring-slate-200/70">
+        <h2 class="text-lg font-semibold mb-2" data-i18n="disclaimerH">Disclaimer</h2>
+        <p class="text-xs text-slate-600" id="disclaimerText">This is an estimate for education only. Lenders use different IRD formulas (posted vs. discounted, daily compounding, etc.). Contact your lender for an official payout figure.</p>
+      </section>
+    </aside>
+  </main>
+
+  <section class="max-w-6xl mx-auto px-4 pb-24">
+    <div class="bg-white/90 backdrop-blur rounded-2xl shadow-md p-6 prose" id="qaSEO">
+      <!-- Filled by JS with EN/FR content -->
+    </div>
+  </section>
+
+  <!-- Mobile sticky toolbar -->
+  <div class="mobile-toolbar fixed bottom-0 inset-x-0 lg:hidden no-print border-t bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 grid grid-cols-2 gap-3 text-sm">
+      <div>
+        <div class="text-slate-600" id="mobPenaltyLabel">Penalty</div>
+        <div class="font-semibold" id="mobileBarPenalty">—</div>
+      </div>
+      <div class="text-right">
+        <div class="text-slate-600" id="mobNetLabel">Net</div>
+        <div class="font-semibold" id="mobileBarNet">—</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="max-w-6xl mx-auto px-4 pb-10 text-center text-xs text-slate-500">
+    <p>Open-source: single HTML file, client-side only. Optimize SEO with an EN/FR guide below the tool targeting keywords like “mortgage penalty Quebec”, “IRD Canada”, “refinance calculator”.</p>
+  </footer>
+
+  <script>
+    // -------------------- i18n --------------------
+    const I18N = {
+      en: {
+        title: "Mortgage & Refinance Penalty Calculator",
+        sub: "Works entirely in your browser. No sign-in. No backend.",
+        inputs: "Inputs",
+        mortType: "Mortgage type",
+        currency: "Currency",
+        principal: "Original mortgage amount",
+        rate: "Contract rate (% APR)",
+        amortYears: "Amortization (years)",
+        termYears: "Term length (years)",
+        termStart: "Term start date",
+        breakDate: "Break date (today or planned)",
+        payFreq: "Payment frequency",
+        knowBalance: "I know my current balance",
+        currentBalance: "Current balance (if known)",
+        monthsRemaining: "Months remaining in term (override)",
+        compRate: "Comparable rate for remaining term (%)",
+        prepay: "Prepayment before breaking ($)",
+        fees: "Other fees ($)",
+        irdNote: "For fixed rates, lenders typically charge the greater of 3 months’ interest or an Interest Rate Differential (IRD). This IRD estimate uses (contract rate − comparable rate) × balance × remaining term (years).",
+        newRate: "Refinance/new rate (% APR)",
+        rollPenalty: "Roll penalty into new mortgage?",
+        horizon: "Compare over remaining term months",
+        compareNote: "We compare the interest cost of keeping your current mortgage vs. refinancing at the new rate, over the months remaining in your current term.",
+        summary: "Summary",
+        payment: "Monthly payment",
+        paymentEq: "Approx. monthly equivalent",
+        elapsed: "Months elapsed",
+        remain: "Months remaining (term)",
+        balance: "Estimated balance",
+        threeMonths: "3 months’ interest",
+        ird: "IRD estimate",
+        penalty: "Estimated penalty",
+        fees2: "Other fees",
+        prepay2: "Applied prepayment",
+        refi: "Refinance impact",
+        intKeep: "Interest cost — keep",
+        intRefi: "Interest cost — refi",
+        savings: "Interest savings",
+        net: "Net vs. penalty & fees",
+        breakeven: "Break-even (months)",
+        sponsor: "Sponsored",
+        disclaimerH: "Disclaimer",
+        disclaimer: "This is an estimate for education only. Lenders use different IRD formulas (posted vs. discounted, daily compounding, etc.). Contact your lender for an official payout figure.",
+        share: "Copy share link",
+        copied: "Copied!",
+        reset: "Reset",
+        print: "Print",
+        pdf: "Export PDF",
+        penaltyHero: "Estimated penalty",
+        savingsHero: "Potential interest savings",
+        netHero: "Net outcome",
+        positive: "Positive",
+        negative: "Negative",
+        // Radar
+        visual: "Visualization",
+        radarCaption: "Higher area = higher cost (worse). Lower is better.",
+        axisInterest: "Interest cost (horizon)",
+        axisPayment: "Monthly equivalent",
+        axisBalance: "Balance after horizon",
+        axisUpfront: "Upfront cost",
+        keepLabel: "Keep",
+        refiLabel: "Refi",
+        qaHTML: `
+          <h2>Quebec/Canada Mortgage Penalty — FAQs</h2>
+          <details open><summary><strong>What is an IRD (Interest Rate Differential)?</strong></summary>
+            <p>For <em>fixed-rate</em> mortgages in Canada, lenders typically charge the higher of: (1) three months’ interest, or (2) an IRD that approximates the interest the lender loses if you break early. Many banks compute IRD from their <em>posted</em> (not discounted) rates for terms matching your remaining term.</p>
+          </details>
+          <details><summary><strong>When do lenders use 3 months’ interest?</strong></summary>
+            <p>Most <em>variable-rate</em> mortgages use a penalty equal to three months’ interest. Fixed-rate penalties are often the greater of 3 months or IRD.</p>
+          </details>
+          <details><summary><strong>Posted vs. discounted rates — why it matters</strong></summary>
+            <p>Some lenders use posted rates to compute IRD, which can produce a larger penalty than using discounted rates. Our calculator lets you enter a <em>comparable rate</em> so you can explore both scenarios.</p>
+          </details>
+          <details><summary><strong>Typical prepayment privileges (Canada)</strong></summary>
+            <p>Many mortgages allow annual prepayments of 10–20% and payment increases (e.g., 15/15). Enter a prepayment amount before breaking to see its impact on penalties.</p>
+          </details>
+          <details><summary><strong>Bi-weekly vs. accelerated bi-weekly</strong></summary>
+            <p><em>Bi-weekly</em> recalculates the payment over 26 periods/year. <em>Accelerated bi-weekly</em> pays half of the monthly payment every two weeks, resulting in roughly one extra monthly payment per year (≈13 monthly payments), which shortens amortization and reduces interest faster.</p>
+          </details>
+          <details><summary><strong>Quebec notes</strong></summary>
+            <p>Notary fees, discharge fees, and other administrative costs can apply when refinancing in Quebec. Penalty calculations are lender-specific; always request an official payout statement for accurate figures.</p>
+          </details>
+          <p class="text-xs text-slate-500">This tool uses simplified APR math with interest accrued per payment period. Actual lender methods (e.g., semi-annual compounding not-in-advance) may differ.</p>
+        `,
+      },
+      fr: {
+        title: "Calculateur de pénalité hypothécaire & refinancement",
+        sub: "Fonctionne entièrement dans votre navigateur. Sans compte. Sans serveur.",
+        inputs: "Entrées",
+        mortType: "Type d’hypothèque",
+        currency: "Devise",
+        principal: "Montant hypothécaire initial",
+        rate: "Taux contractuel (% annuel)",
+        amortYears: "Amortissement (années)",
+        termYears: "Durée du terme (années)",
+        termStart: "Date de début du terme",
+        breakDate: "Date de rupture (aujourd’hui ou prévue)",
+        payFreq: "Fréquence des paiements",
+        knowBalance: "Je connais mon solde actuel",
+        currentBalance: "Solde actuel (si connu)",
+        monthsRemaining: "Mois restants du terme (remplacer)",
+        compRate: "Taux comparable pour la durée restante (%)",
+        prepay: "Prépaiement avant rupture ($)",
+        fees: "Autres frais ($)",
+        irdNote: "Pour les taux fixes, les prêteurs facturent généralement le plus élevé entre 3 mois d’intérêts et la Différence de Taux d’Intérêt (DTI/IRD). Cette estimation utilise (taux contractuel − taux comparable) × solde × durée restante (années).",
+        newRate: "Nouveau taux de refinancement (% annuel)",
+        rollPenalty: "Inclure la pénalité dans la nouvelle hypothèque ?",
+        horizon: "Comparer sur les mois restants du terme",
+        compareNote: "Nous comparons le coût d’intérêt à conserver l’hypothèque actuelle vs. refinancer au nouveau taux, sur les mois restants du terme.",
+        summary: "Résumé",
+        payment: "Paiement mensuel",
+        paymentEq: "Équiv. mensuel approx.",
+        elapsed: "Mois écoulés",
+        remain: "Mois restants (terme)",
+        balance: "Solde estimé",
+        threeMonths: "Intérêts de 3 mois",
+        ird: "Estimation DTI/IRD",
+        penalty: "Pénalité estimée",
+        fees2: "Autres frais",
+        prepay2: "Prépaiement appliqué",
+        refi: "Impact du refinancement",
+        intKeep: "Coût d’intérêt — conserver",
+        intRefi: "Coût d’intérêt — refinancer",
+        savings: "Économies d’intérêt",
+        net: "Net vs. pénalité & frais",
+        breakeven: "Seuil de rentabilité (mois)",
+        sponsor: "Sponsorisé",
+        disclaimerH: "Avertissement",
+        disclaimer: "Outil d’estimation à titre indicatif. Les prêteurs utilisent diverses formules de DTI (taux affiché vs escompté, capitalisation quotidienne, etc.). Demandez un montant officiel à votre prêteur.",
+        share: "Copier le lien",
+        copied: "Copié !",
+        reset: "Réinitialiser",
+        print: "Imprimer",
+        pdf: "Exporter en PDF",
+        penaltyHero: "Pénalité estimée",
+        savingsHero: "Économies d’intérêt potentielles",
+        netHero: "Résultat net",
+        positive: "Positif",
+        negative: "Négatif",
+        visual: "Visualisation",
+        radarCaption: "Aire plus grande = coût plus élevé (moins bon). Plus petit est meilleur.",
+        axisInterest: "Coût d’intérêt (horizon)",
+        axisPayment: "Équiv. mensuel",
+        axisBalance: "Solde après horizon",
+        axisUpfront: "Coût immédiat",
+        keepLabel: "Conserver",
+        refiLabel: "Refinancer",
+        qaHTML: `
+          <h2>Québec/Canada — FAQ sur les pénalités hypothécaires</h2>
+          <details open><summary><strong>Qu’est-ce que la DTI (IRD) ?</strong></summary>
+            <p>Pour les hypothèques à <em>taux fixe</em>, la pénalité est généralement le plus élevé entre : (1) trois mois d’intérêts, ou (2) une DTI qui reflète l’intérêt perdu par le prêteur si vous rompez le terme. Plusieurs banques utilisent leurs <em>taux affichés</em> (et non escomptés) pour la DTI.</p>
+          </details>
+          <details><summary><strong>Quand applique-t-on 3 mois d’intérêts ?</strong></summary>
+            <p>La plupart des hypothèques à <em>taux variable</em> utilisent une pénalité de trois mois d’intérêts. Les taux fixes utilisent souvent le plus élevé entre 3 mois et la DTI.</p>
+          </details>
+          <details><summary><strong>Taux affichés vs escomptés</strong></summary>
+            <p>Certains prêteurs calculent la DTI à partir des taux affichés, ce qui peut augmenter la pénalité. Notre calculateur permet d’entrer un <em>taux comparable</em> pour comparer différents scénarios.</p>
+          </details>
+          <details><summary><strong>Privilèges de prépaiement (Canada)</strong></summary>
+            <p>Beaucoup d’hypothèques permettent des prépaiements annuels de 10–20 % et des hausses de paiement (ex. 15/15). Entrez un montant de prépaiement pour voir l’impact.</p>
+          </details>
+          <details><summary><strong>Aux deux semaines vs. aux deux semaines accéléré</strong></summary>
+            <p>Le mode <em>aux deux semaines</em> recalcule le paiement sur 26 périodes/an. Le mode <em>accéléré</em> verse la moitié du paiement mensuel toutes les deux semaines (≈ 13 paiements mensuels/an), ce qui raccourcit l’amortissement.</p>
+          </details>
+          <details><summary><strong>Particularités au Québec</strong></summary>
+            <p>Des frais de notaire, de radiation et d’administration peuvent s’appliquer lors d’un refinancement. Les calculs de pénalité varient selon le prêteur — demandez toujours un état officiel de remboursement.</p>
+          </details>
+          <p class="text-xs text-slate-500">Cet outil utilise une modélisation simplifiée avec intérêt par période de paiement. Les méthodes réelles (ex. capitalisation semi-annuelle non anticipée) peuvent différer.</p>
+        `,
+      }
+    };
+
+    let LANG = 'en';
+    let LAST = null; // last computed results for PDF & radar
+    let radarChart = null;
+
+    function $(id){ return document.getElementById(id); }
+    function money(n, cur){ try { return (isFinite(n)?n:0).toLocaleString(undefined,{style:'currency',currency:cur||'CAD'});}catch{return (isFinite(n)?n:0).toFixed(2);} }
+
+    function setDatesDefaults(){
+      const today = new Date();
+      $('breakDate').value = toYMD(today);
+      const termStart = new Date(today);
+      termStart.setFullYear(today.getFullYear()-1); // default: started 1y ago
+      $('termStart').value = toYMD(termStart);
+    }
+    function toYMD(d){ const m=(d.getMonth()+1).toString().padStart(2,'0'); const day=d.getDate().toString().padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
+    function monthsBetween(a,b){
+      const d1 = new Date(a), d2 = new Date(b);
+      let months = (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth());
+      if (d2.getDate() < d1.getDate()) months -= 1;
+      return Math.max(0, months);
+    }
+
+    // ---------- Payment helpers (supports monthly/bi-weekly/accelerated) ----------
+    function paymentMonthly(P, annualRate, nMonths){
+      const r = (annualRate/100)/12;
+      if (r === 0) return P / nMonths;
+      const pow = Math.pow(1+r, nMonths);
+      return P * r * pow / (pow - 1);
+    }
+    function paymentFor(P, annualRate, amortMonths, freq, mode){
+      if (freq === 12) {
+        return { per: paymentMonthly(P, annualRate, amortMonths), periods: amortMonths };
+      }
+      if (mode === 'abw') {
+        // Accelerated bi-weekly: half the monthly payment, paid 26x per year
+        return { per: paymentMonthly(P, annualRate, amortMonths)/2, periods: Math.round(amortMonths*freq/12) };
+      }
+      // Exact bi-weekly re-amortized to 26 periods/year
+      const r = (annualRate/100)/freq;
+      const N = Math.max(1, Math.round(amortMonths*freq/12));
+      if (r === 0) return { per: P / N, periods: N };
+      const pow = Math.pow(1+r, N);
+      return { per: P * r * pow / (pow - 1), periods: N };
+    }
+    function balanceAfterGeneral(P, annualRate, amortMonths, kMonths){
+      const r = (annualRate/100)/12;
+      const M = paymentMonthly(P, annualRate, amortMonths);
+      if (r === 0) return P * (1 - kMonths/Math.max(1, amortMonths));
+      const pow = Math.pow(1+r, kMonths);
+      return P * pow - M * ( (pow - 1) / r );
+    }
+    function threeMonthsInterest(balance, annualRate){
+      return balance * (annualRate/100) / 12 * 3;
+    }
+    function irdEstimate(contractRate, compRate, balance, monthsRemaining){
+      const diff = Math.max(0, (contractRate - compRate)/100);
+      return balance * diff * (monthsRemaining/12);
+    }
+
+    function summarizeInterestFreq(bal, annualRate, monthsHorizon, amortMonthsRemaining, freq, mode){
+      const per = paymentFor(bal, annualRate, amortMonthsRemaining, freq, mode).per;
+      const r = (annualRate/100)/freq;
+      const nPeriods = Math.max(0, Math.round(monthsHorizon * freq / 12));
+      let B = bal, interestSum = 0;
+      for (let i=0;i<nPeriods;i++){
+        const interest = B * r;
+        const principal = per - interest;
+        B = Math.max(0, B - principal);
+        interestSum += Math.max(0, interest);
+        if (B <= 0) break;
+      }
+      return { interestSum, perPayment: per, monthlyEq: per * (freq/12), endBalance: B };
+    }
+
+    function fmtMonths(n){ return isFinite(n)?Math.max(0,Math.round(n)).toString(): '—'; }
+
+    // ---------- Radar chart ----------
+    function updateRadar(keep, refi, penalty, fees){
+      const d = I18N[LANG];
+      const axes = [d.axisInterest, d.axisPayment, d.axisBalance, d.axisUpfront];
+
+      // Raw values: higher = worse (cost burden)
+      const rawKeep = [
+        Math.max(0, keep.interestSum),
+        Math.max(0, keep.monthlyEq),
+        Math.max(0, keep.endBalance),
+        0 // upfront cost for keep
+      ];
+      const rawRefi = [
+        Math.max(0, refi.interestSum),
+        Math.max(0, refi.monthlyEq),
+        Math.max(0, refi.endBalance),
+        Math.max(0, penalty + fees)
+      ];
+
+      // Normalize per-axis to 0..100 across the two options
+      const norm = (k, r) => {
+        return k.map((kv, i) => {
+          const max = Math.max(1e-9, kv, r[i]); // avoid /0
+          return Math.min(100, (kv / max) * 100);
+        });
+      };
+      const keepNorm = norm(rawKeep, rawRefi);
+      const refiNorm = norm(rawRefi, rawKeep);
+
+      const data = {
+        labels: axes,
+        datasets: [
+          {
+            label: d.keepLabel,
+            data: keepNorm,
+            fill: true,
+            borderWidth: 1,
+            pointRadius: 2
+          },
+          {
+            label: d.refiLabel,
+            data: refiNorm,
+            fill: true,
+            borderWidth: 1,
+            pointRadius: 2
+          }
+        ]
+      };
+
+      const options = {
+        animation: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.r)}`
+            }
+          }
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { stepSize: 20, showLabelBackdrop: false }
+          }
+        }
+      };
+
+      if (window.Chart) {
+        if (window.radarChart) {
+          window.radarChart.data = data;
+          window.radarChart.options = options;
+          window.radarChart.update();
+        } else {
+          const ctx = document.getElementById('radarChart').getContext('2d');
+          window.radarChart = new Chart(ctx, { type: 'radar', data, options });
+        }
+      }
+
+      const caption = document.getElementById('radarCaption'); 
+      if (caption) caption.textContent = d.radarCaption;
+    }
+
+    function recalc(){
+      const cur = document.getElementById('currency').value || 'CAD';
+      const type = document.getElementById('mortType').value;
+      const principal = Number(document.getElementById('principal').value||0);
+      const rate = Number(document.getElementById('rate').value||0);
+      const amortYears = Number(document.getElementById('amortYears').value||25);
+      const termYears = Number(document.getElementById('termYears').value||5);
+      const termStart = document.getElementById('termStart').value;
+      const breakDate = document.getElementById('breakDate').value;
+      const payFreqSel = document.getElementById('payFreq').value; // m, bw, abw
+      const freq = (payFreqSel==='m')?12:26;
+      const mode = (payFreqSel==='abw')?'abw':'biweekly';
+      const knowBalance = document.getElementById('knowBalance').checked;
+      const currentBalance = Number(document.getElementById('currentBalance').value||0);
+      const monthsOverride = document.getElementById('monthsRemaining').value ? Number(document.getElementById('monthsRemaining').value) : null;
+      const compRate = Number(document.getElementById('compRate').value||0);
+      const prepay = Math.max(0, Number(document.getElementById('prepay').value||0));
+      const fees = Math.max(0, Number(document.getElementById('fees').value||0));
+      const newRate = Number(document.getElementById('newRate').value||0);
+      const rollPenalty = document.getElementById('rollPenalty').value === 'yes';
+      const horizonInput = document.getElementById('horizon').value ? Number(document.getElementById('horizon').value) : null;
+
+      const amortMonths = Math.max(1, Math.round(amortYears*12));
+      const termMonths = Math.max(1, Math.round(termYears*12));
+
+      // Months elapsed since term start to break date
+      const elapsed = monthsBetween(termStart, breakDate);
+      const remainingTerm = monthsOverride ?? Math.max(0, termMonths - elapsed);
+
+      // Outstanding balance (approximate using monthly model)
+      const estBalance = knowBalance && currentBalance>0
+        ? currentBalance
+        : balanceAfterGeneral(principal, rate, amortMonths, Math.min(elapsed, amortMonths));
+
+      const appliedPrepay = Math.min(prepay, estBalance);
+      const balForPenalty = Math.max(0, estBalance - appliedPrepay);
+
+      // Penalties
+      const three = threeMonthsInterest(balForPenalty, rate);
+      const ird = irdEstimate(rate, compRate, balForPenalty, remainingTerm);
+      const penalty = (type === 'fixed') ? Math.max(three, ird) : three;
+
+      // Refi comparison horizon
+      const horizon = horizonInput ?? remainingTerm;
+
+      // Keep vs Refi interest over horizon (respect payment frequency)
+      const keep = summarizeInterestFreq(estBalance, rate, horizon, Math.max(1, amortMonths - elapsed), freq, mode);
+      const refiStartBalance = rollPenalty ? estBalance + penalty + fees : estBalance;
+      const refi = summarizeInterestFreq(refiStartBalance, newRate, horizon, Math.max(1, amortMonths - elapsed), freq, mode);
+
+      const savings = Math.max(0, keep.interestSum - refi.interestSum);
+      const net = savings - (penalty + fees);
+
+      // Break-even months using period-by-period interest difference
+      let beMonths = null;
+      {
+        const perK = keep.perPayment; const perR = refi.perPayment;
+        const rK = (rate/100)/freq; const rR = (newRate/100)/freq;
+        let Bk = estBalance, Br = refiStartBalance, cum = 0;
+        const nP = Math.max(0, Math.round(horizon * freq / 12));
+        for (let p=1; p<=nP; p++){
+          const ic = Bk * rK; const pc = perK - ic; Bk = Math.max(0, Bk - pc);
+          const ir = Br * rR; const pr = perR - ir; Br = Math.max(0, Br - pr);
+          cum += Math.max(0, ic - ir);
+          if (cum >= (penalty + fees)) { beMonths = Math.ceil(p * 12 / freq); break; }
+          if (Bk<=0 || Br<=0) break;
+        }
+      }
+
+      // Outputs — hero
+      document.getElementById('heroPenalty').textContent = money(penalty, cur);
+      document.getElementById('heroSavings').textContent = money(savings, cur);
+      document.getElementById('heroNet').textContent = money(net, cur);
+      const badge = document.getElementById('heroBadge');
+      const positive = net >= 0;
+      badge.textContent = positive ? I18N[LANG].positive : I18N[LANG].negative;
+      badge.className = `text-xs px-2 py-1 rounded-full ${positive? 'bg-emerald-100 text-emerald-800':'bg-rose-100 text-rose-800'}`;
+
+      // Outputs — right rail
+      const payLabel = (freq===12)?(LANG==='fr'? 'Paiement (mensuel)':'Payment (monthly)') : (LANG==='fr'? ((mode==='abw')?'Paiement (aux 2 sem. accéléré)':'Paiement (aux 2 semaines)') : ((mode==='abw')?'Payment (accelerated bi-weekly)':'Payment (bi-weekly)'));
+      document.getElementById('payLabel').textContent = payLabel;
+      document.getElementById('outPaymentPer').textContent = money(keep.perPayment, cur);
+      document.getElementById('outPaymentMoEq').textContent = money(keep.monthlyEq, cur);
+      document.getElementById('outElapsed').textContent = fmtMonths(elapsed);
+      document.getElementById('outRemain').textContent = fmtMonths(remainingTerm);
+      document.getElementById('outBalance').textContent = money(estBalance, cur);
+
+      document.getElementById('outThree').textContent = money(three, cur);
+      document.getElementById('outIRD').textContent = money(ird, cur);
+      document.getElementById('outPenalty').textContent = money(penalty, cur);
+      document.getElementById('outFees').textContent = money(fees, cur);
+      document.getElementById('outPrepay').textContent = money(appliedPrepay, cur);
+
+      document.getElementById('outKeepInt').textContent = money(keep.interestSum, cur);
+      document.getElementById('outRefiInt').textContent = money(refi.interestSum, cur);
+      document.getElementById('outSavings').textContent = money(savings, cur);
+      document.getElementById('outNet').textContent = money(net, cur);
+      document.getElementById('outBE').textContent = beMonths===null ? '—' : beMonths.toString();
+
+      // Progress bar for savings vs penalty+fees
+      const denom = Math.max(1, penalty + fees);
+      const pct = Math.max(0, Math.min(100, (savings/denom)*100));
+      document.getElementById('savingsBar').style.width = pct + '%';
+
+      // Mobile toolbar
+      document.getElementById('mobileBarPenalty').textContent = money(penalty, cur);
+      document.getElementById('mobileBarNet').textContent = money(net, cur);
+      document.getElementById('mobPenaltyLabel').textContent = I18N[LANG].penaltyHero;
+      document.getElementById('mobNetLabel').textContent = I18N[LANG].netHero;
+
+      // Save last results for PDF & update radar
+      LAST = {
+        cur, type, principal, rate, amortYears, termYears, termStart, breakDate,
+        payFreqSel, knowBalance, currentBalance, monthsOverride, compRate, prepay, fees, newRate, rollPenalty, horizon,
+        estBalance, elapsed, remainingTerm, three, ird, penalty, keep, refi, savings, net, beMonths
+      };
+
+      updateRadar(keep, refi, penalty, fees);
+      saveState();
+    }
+
+    // -------------------- Share / State --------------------
+    function readState(){
+      try{
+        const hash = location.hash.replace(/^#/,'');
+        if(!hash) return null;
+        const obj = JSON.parse(atob(decodeURIComponent(hash)));
+        return obj && obj.v===1 ? obj : null;
+      }catch{ return null }
+    }
+    function applyState(obj){
+      if(!obj) return;
+      document.getElementById('mortType').value = obj.type||'fixed';
+      document.getElementById('currency').value = obj.cur||'CAD';
+      document.getElementById('principal').value = obj.principal??450000;
+      document.getElementById('rate').value = obj.rate??5.29;
+      document.getElementById('amortYears').value = obj.amortYears??25;
+      document.getElementById('termYears').value = obj.termYears??5;
+      document.getElementById('termStart').value = obj.termStart || document.getElementById('termStart').value;
+      document.getElementById('breakDate').value = obj.breakDate || document.getElementById('breakDate').value;
+      document.getElementById('payFreq').value = obj.payFreqSel || 'm';
+      document.getElementById('knowBalance').checked = !!obj.knowBalance;
+      document.getElementById('currentBalance').value = obj.currentBalance??'';
+      document.getElementById('monthsRemaining').value = obj.monthsRemaining??'';
+      document.getElementById('compRate').value = obj.compRate??4.49;
+      document.getElementById('prepay').value = obj.prepay??0;
+      document.getElementById('fees').value = obj.fees??300;
+      document.getElementById('newRate').value = obj.newRate??4.29;
+      document.getElementById('rollPenalty').value = obj.rollPenalty?'yes':'no';
+      document.getElementById('horizon').value = obj.horizon??'';
+      setLang(obj.lang||'en', false);
+    }
+    function stateFromInputs(){
+      return {
+        v:1,
+        lang: LANG,
+        type: document.getElementById('mortType').value,
+        cur: document.getElementById('currency').value,
+        principal: Number(document.getElementById('principal').value||0),
+        rate: Number(document.getElementById('rate').value||0),
+        amortYears: Number(document.getElementById('amortYears').value||0),
+        termYears: Number(document.getElementById('termYears').value||0),
+        termStart: document.getElementById('termStart').value,
+        breakDate: document.getElementById('breakDate').value,
+        payFreqSel: document.getElementById('payFreq').value,
+        knowBalance: document.getElementById('knowBalance').checked,
+        currentBalance: Number(document.getElementById('currentBalance').value||0),
+        monthsRemaining: document.getElementById('monthsRemaining').value? Number(document.getElementById('monthsRemaining').value): '',
+        compRate: Number(document.getElementById('compRate').value||0),
+        prepay: Number(document.getElementById('prepay').value||0),
+        fees: Number(document.getElementById('fees').value||0),
+        newRate: Number(document.getElementById('newRate').value||0),
+        rollPenalty: document.getElementById('rollPenalty').value==='yes',
+        horizon: document.getElementById('horizon').value? Number(document.getElementById('horizon').value): '',
+      };
+    }
+    function copyShare(){
+      const payload = stateFromInputs();
+      const hash = encodeURIComponent(btoa(JSON.stringify(payload)));
+      const url = `${location.origin}${location.pathname}#${hash}`;
+      navigator.clipboard?.writeText(url).then(()=>{
+        const b = document.getElementById('shareBtn'); const orig = b.textContent; b.textContent = (LANG==='fr'?I18N.fr.copied:I18N.en.copied);
+        setTimeout(()=> b.textContent = (LANG==='fr'?I18N.fr.share:I18N.en.share), 1200);
+      });
+    }
+    function saveState(){ try{ localStorage.setItem('mort-calc', JSON.stringify(stateFromInputs())); }catch{} }
+    function loadState(){ try{ const s = JSON.parse(localStorage.getItem('mort-calc')||'null'); if(s){ applyState(s); } }catch{} }
+
+    // -------------------- PDF Export --------------------
+    function exportPDF(){
+      try{
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const d = I18N[LANG];
+        let y = 12;
+        doc.setFontSize(16); doc.text(d.title, 14, y); y += 6;
+        doc.setFontSize(10); doc.text((new Date()).toLocaleString(), 14, y); y += 8;
+
+        function line(label, val){
+          const maxW = 180;
+          doc.setFontSize(11);
+          doc.text(`${label}: ${val}`, 14, y, { maxWidth: maxW });
+          y += 6; if (y > 280) { doc.addPage(); y = 12; }
+        }
+
+        if(!LAST){ recalc(); }
+        const L = LAST || {};
+        const freqLabel = (L.payFreqSel==='m')?(LANG==='fr'? 'Mensuel':'Monthly'):(L.payFreqSel==='abw')?(LANG==='fr'? 'Aux 2 sem. accéléré':'Accelerated bi-weekly'):(LANG==='fr'? 'Aux 2 semaines':'Bi-weekly');
+
+        doc.setFontSize(13); doc.text(LANG==='fr'? 'Entrées':'Inputs', 14, y); y += 6;
+        line(d.mortType, document.getElementById('mortType').value);
+        line(d.currency, document.getElementById('currency').value);
+        line(d.principal, money(L.principal, L.cur));
+        line(d.rate, `${L.rate}%`);
+        line(d.amortYears, `${L.amortYears}`);
+        line(d.termYears, `${L.termYears}`);
+        line(d.termStart, L.termStart);
+        line(d.breakDate, L.breakDate);
+        line(d.payFreq, freqLabel);
+        if (L.knowBalance) line(d.currentBalance, money(L.currentBalance, L.cur));
+        if (L.monthsOverride) line(d.monthsRemaining, `${L.monthsOverride}`);
+        line(d.compRate, `${L.compRate}%`);
+        line(d.prepay, money(L.prepay, L.cur));
+        line(d.fees, money(L.fees, L.cur));
+        line(d.newRate, `${L.newRate}%`);
+        line(d.rollPenalty, L.rollPenalty? (LANG==='fr'? 'Oui':'Yes') : (LANG==='fr'? 'Non':'No'));
+        if (L.horizon) line(d.horizon, `${L.horizon}`);
+
+        doc.setFontSize(13); doc.text(LANG==='fr'? 'Résultats':'Results', 14, y); y += 6;
+        line(LANG==='fr'? 'Paiement (période)':'Payment (per period)', money(L.keep?.perPayment, L.cur));
+        line(d.paymentEq, money(L.keep?.monthlyEq, L.cur));
+        line(d.elapsed, `${L.elapsed}`);
+        line(d.remain, `${L.remainingTerm}`);
+        line(d.balance, money(L.estBalance, L.cur));
+        line(d.threeMonths, money(L.three, L.cur));
+        line(d.ird, money(L.ird, L.cur));
+        line(d.penalty, money(L.penalty, L.cur));
+        line(d.fees2, money(L.fees, L.cur));
+        line(d.prepay2, money(L.prepay, L.cur));
+        line(d.intKeep, money(L.keep?.interestSum, L.cur));
+        line(d.intRefi, money(L.refi?.interestSum, L.cur));
+        line(d.savings, money(L.savings, L.cur));
+        line(d.net, money(L.net, L.cur));
+        line(d.breakeven, L.beMonths==null? '—' : `${L.beMonths}`);
+
+        doc.setFontSize(9);
+        doc.text(d.disclaimer, 14, y+4, { maxWidth: 180 });
+        doc.save('mortgage-penalty-report.pdf');
+      }catch(e){ alert('PDF export failed.'); }
+    }
+
+    // -------------------- Lang --------------------
+    function setLang(l, refresh=true){
+      LANG = (l==='fr')?'fr':'en';
+      const dict = I18N[LANG];
+      document.title = dict.title + ' · No Backend';
+      document.getElementById('app-title').textContent = dict.title;
+      document.getElementById('app-sub').textContent = dict.sub;
+      document.getElementById('langBtn').textContent = (LANG==='fr'? 'EN':'FR');
+      document.getElementById('shareBtn').textContent = dict.share;
+      document.getElementById('resetBtn').textContent = dict.reset;
+      document.getElementById('pdfBtn').textContent = dict.pdf;
+      document.querySelectorAll('[data-i18n]').forEach(el=>{
+        const key = el.getAttribute('data-i18n');
+        if(dict[key]) el.textContent = dict[key];
+      });
+      document.getElementById('disclaimerText').textContent = dict.disclaimer;
+      document.getElementById('qaSEO').innerHTML = dict.qaHTML;
+      const radarCaption = document.getElementById('radarCaption'); if (radarCaption) radarCaption.textContent = dict.radarCaption;
+      document.getElementById('heroPenaltyLabel').textContent = dict.penaltyHero;
+      document.getElementById('heroSavingsLabel').textContent = dict.savingsHero;
+      document.getElementById('heroNetLabel').textContent = dict.netHero;
+      if (refresh) recalc();
+    }
+
+    // -------------------- Events --------------------
+    window.addEventListener('DOMContentLoaded', ()=>{
+      setDatesDefaults();
+      const s = readState();
+      if(s){ applyState(s); } else { loadState(); }
+      setLang(LANG,false); // initial labels
+      recalc();
+
+      ['mortType','currency','principal','rate','amortYears','termYears','termStart','breakDate','payFreq','knowBalance','currentBalance','monthsRemaining','compRate','prepay','fees','newRate','rollPenalty','horizon']
+        .forEach(id=> document.getElementById(id).addEventListener('input', recalc));
+      document.getElementById('calcBtn').addEventListener('click', recalc);
+      document.getElementById('shareBtn').addEventListener('click', copyShare);
+      document.getElementById('langBtn').addEventListener('click', ()=> setLang(LANG==='fr'?'en':'fr'));
+      document.getElementById('resetBtn').addEventListener('click', ()=>{ localStorage.removeItem('mort-calc'); location.hash=''; location.reload(); });
+      document.getElementById('pdfBtn').addEventListener('click', exportPDF);
+    });
+  </script>
+</body>
+</html>
